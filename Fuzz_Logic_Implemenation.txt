@@ -1,0 +1,50 @@
+% Create a fuzzy inference system (FIS)
+fis = newfis('EnvironmentalControl');
+
+% Step 1: Define Input Variable - Temperature
+% Define the range for temperature (e.g., 0 to 40 degrees Celsius)
+fis = addvar(fis, 'input', 'Temperature', [0 40]);
+
+% Define membership functions for Temperature
+% Cold (0 to 15)
+fis = addmf(fis, 'input', 1, 'Cold', 'trapmf', [-Inf 0 10 15]);
+% Comfortable (15 to 25)
+fis = addmf(fis, 'input', 1, 'Comfortable', 'trimf', [15 20 25]);
+% Hot (20 to 40)
+fis = addmf(fis, 'input', 1, 'Hot', 'trapmf', [20 30 40 Inf]);
+
+% Step 2: Define Output Variable - Heating Power
+% Define the range for heating power (0 to 100%)
+fis = addvar(fis, 'output', 'HeatingPower', [0 100]);
+
+% Define membership functions for Heating Power
+% Off (0)
+fis = addmf(fis, 'output', 1, 'Off', 'trimf', [0 0 0]);
+% Low (0 to 50)
+fis = addmf(fis, 'output', 1, 'Low', 'trimf', [0 25 50]);
+% Medium (25 to 75)
+fis = addmf(fis, 'output', 1, 'Medium', 'trimf', [25 50 75]);
+% High (50 to 100)
+fis = addmf(fis, 'output', 1, 'High', 'trimf', [50 100 100]);
+
+% Step 3: Define Fuzzy Rules
+% Create a rule list
+ruleList = [
+    1 1 1 1;  % If Temperature is Cold, then HeatingPower is High
+    2 2 1 1;  % If Temperature is Comfortable, then HeatingPower is Medium
+    3 3 1 1;  % If Temperature is Hot, then HeatingPower is Off
+];
+
+% Add rules to the FIS
+fis = addrule(fis, ruleList);
+
+% Step 4: Evaluate the FIS
+% Example input for Temperature
+temperatureInput = 22; % Change this value to test different temperatures
+
+% Evaluate the fuzzy inference system
+heatingPowerOutput = evalfis(fis, temperatureInput);
+
+% Display the result
+fprintf('Input Temperature: %.2f°C\n', temperatureInput);
+fprintf('Recommended Heating Power: %.2f%%\n', heatingPowerOutput);
