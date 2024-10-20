@@ -1,0 +1,51 @@
+matlab
+Copy code
+% Step 1: Load the dataset
+data = readtable('/mnt/data/historic_demand_2009_2024.csv');
+
+% Step 2: Set the column names for date and load
+dateColumnName = 'settlement_date';
+loadColumnName = 'england_wales_demand';
+
+% Step 3: Preprocess the data
+% Convert the date column to datetime format
+data.(dateColumnName) = datetime(data.(dateColumnName), 'InputFormat', 'yyyy-MM-dd');
+
+% Step 4: Aggregate the data to monthly levels (average)
+% Create a timetable for easy time-based manipulation
+timetableData = table2timetable(data(:, {dateColumnName, loadColumnName}));
+
+% Resample the data to monthly mean
+monthlyData = retime(timetableData, 'monthly', 'mean');
+
+% Step 5: Split the data into training (2009-2022) and testing (2023 onwards)
+trainEndDate = datetime(2022, 12, 31);
+trainData = monthlyData(monthlyData.Time <= trainEndDate, :);
+testData = monthlyData(monthlyData.Time > trainEndDate, :);
+
+% Step 6: Prepare inputs and outputs for training
+% Use the month number and year as features
+trainInputs = [month(trainData.Time), year(trainData.Time)];
+trainOutputs = trainData.(loadColumnName);
+
+% Test inputs
+testInputs = [month(testData.Time), year(testData.Time)];
+testOutputs = testData.(loadColumnName);
+
+% Step 7: Train the Gaussian Process Regression model
+gprModel = fitrgp(trainInputs, trainOutputs, 'KernelFunction', 'squaredexponential');
+
+% Step 8: Make predictions on the test data
+predictedOutputs = predict(gprModel, testInputs);
+
+% Step 9: Visualize the results
+figure;
+hold on;
+plot(trainData.Time, trainOutputs, 'b', 'DisplayName', 'Training Data');
+plot(testData.Time, testOutputs, 'r', 'DisplayName', 'Actual Test Data');
+plot(testData.Time, predictedOutputs, 'g--', 'DisplayName', 'Predicted Test Data');
+legend;
+xlabel('Time');
+ylabel('England and Wales Demand');
+title('Gaussian Process Regression Analysis for Electricity Demand');
+hold off;
