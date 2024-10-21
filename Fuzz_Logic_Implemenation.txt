@@ -1,50 +1,398 @@
-% Create a fuzzy inference system (FIS)
-fis = newfis('EnvironmentalControl');
+% Part 1: Fuzzy Logic Controller (FLC) Design and Implementation (Manual Version)
 
-% Step 1: Define Input Variable - Temperature
-% Define the range for temperature (e.g., 0 to 40 degrees Celsius)
-fis = addvar(fis, 'input', 'Temperature', [0 40]);
+% Define input ranges
+error_range = -10:1:10;
+change_in_error_range = -5:1:5;
 
-% Define membership functions for Temperature
-% Cold (0 to 15)
-fis = addmf(fis, 'input', 1, 'Cold', 'trapmf', [-Inf 0 10 15]);
-% Comfortable (15 to 25)
-fis = addmf(fis, 'input', 1, 'Comfortable', 'trimf', [15 20 25]);
-% Hot (20 to 40)
-fis = addmf(fis, 'input', 1, 'Hot', 'trapmf', [20 30 40 Inf]);
+% Define output range
+output_range = -1:1:1;
 
-% Step 2: Define Output Variable - Heating Power
-% Define the range for heating power (0 to 100%)
-fis = addvar(fis, 'output', 'HeatingPower', [0 100]);
+% Membership function definitions
+% Error Membership Functions
+negative_error = max(min((-10 <= error_range) & (error_range < -5), 1), 0);
+zero_error = max(min((-5 <= error_range) & (error_range < 5), 1), 0);
+positive_error = max(min((0 <= error_range) & (error_range <= 10), 1), 0);
 
-% Define membership functions for Heating Power
-% Off (0)
-fis = addmf(fis, 'output', 1, 'Off', 'trimf', [0 0 0]);
-% Low (0 to 50)
-fis = addmf(fis, 'output', 1, 'Low', 'trimf', [0 25 50]);
-% Medium (25 to 75)
-fis = addmf(fis, 'output', 1, 'Medium', 'trimf', [25 50 75]);
-% High (50 to 100)
-fis = addmf(fis, 'output', 1, 'High', 'trimf', [50 100 100]);
+% Change in Error Membership Functions
+negative_change = max(min((-5 <= change_in_error_range) & (change_in_error_range < -3), 1), 0);
+zero_change = max(min((-3 <= change_in_error_range) & (change_in_error_range < 3), 1), 0);
+positive_change = max(min((0 <= change_in_error_range) & (change_in_error_range <= 5), 1), 0);
 
-% Step 3: Define Fuzzy Rules
-% Create a rule list
-ruleList = [
-    1 1 1 1;  % If Temperature is Cold, then HeatingPower is High
-    2 2 1 1;  % If Temperature is Comfortable, then HeatingPower is Medium
-    3 3 1 1;  % If Temperature is Hot, then HeatingPower is Off
-];
+% Sample input values
+input_error = -3;
+input_change_in_error = 2;
 
-% Add rules to the FIS
-fis = addrule(fis, ruleList);
+% Fuzzification
+error_neg = interp1(error_range, negative_error, input_error, 'linear', 0);
+error_zero = interp1(error_range, zero_error, input_error, 'linear', 0);
+error_pos = interp1(error_range, positive_error, input_error, 'linear', 0);
 
-% Step 4: Evaluate the FIS
-% Example input for Temperature
-temperatureInput = 22; % Change this value to test different temperatures
+change_neg = interp1(change_in_error_range, negative_change, input_change_in_error, 'linear', 0);
+change_zero = interp1(change_in_error_range, zero_change, input_change_in_error, 'linear', 0);
+change_pos = interp1(change_in_error_range, positive_change, input_change_in_error, 'linear', 0);
 
-% Evaluate the fuzzy inference system
-heatingPowerOutput = evalfis(fis, temperatureInput);
+% Define fuzzy rules
+% Rule 1: if error is negative and change_in_error is negative then output is low
+rule1 = min(error_neg, change_neg);
+% Rule 2: if error is zero or change_in_error is zero then output is medium
+rule2 = max(min(error_zero, 1), min(1, change_zero));
+% Rule 3: if error is positive and change_in_error is positive then output is high
+rule3 = min(error_pos, change_pos);
 
-% Display the result
-fprintf('Input Temperature: %.2f°C\n', temperatureInput);
-fprintf('Recommended Heating Power: %.2f%%\n', heatingPowerOutput);
+% Defuzzification using centroid method
+output_low = min(rule1, 1); % Low output corresponds to [-1 -1 0]
+output_medium = min(rule2, 1); % Medium output corresponds to [-1 0 1]
+output_high = min(rule3, 1); % High output corresponds to [0 1 1]
+
+% Calculate the output
+output_values = [-1 0 1]; % Output values for low, medium, high
+output_mf = [output_low, output_medium, output_high];
+centroid = sum(output_mf .* output_values) / sum(output_mf);
+
+% Display FLC output
+fprintf('FLC Output: %.2f\n', centroid);
+
+% Visualization
+
+% 1. Membership Functions for Error
+figure;
+subplot(3, 1, 1);
+hold on;
+plot(error_range, negative_error, 'b', 'LineWidth', 2);
+plot(error_range, zero_error, 'g', 'LineWidth', 2);
+plot(error_range, positive_error, 'r', 'LineWidth', 2);
+xlabel('Error');
+ylabel('Membership Degree');
+title('Membership Functions for Error');
+legend('Negative', 'Zero', 'Positive');
+grid on;
+hold off;
+
+% 2. Membership Functions for Change in Error
+subplot(3, 1, 2);
+hold on;
+plot(change_in_error_range, negative_change, 'b', 'LineWidth', 2);
+plot(change_in_error_range, zero_change, 'g', 'LineWidth', 2);
+plot(change_in_error_range, positive_change, 'r', 'LineWidth', 2);
+xlabel('Change in Error');
+ylabel('Membership Degree');
+title('Membership Functions for Change in Error');
+legend('Negative', 'Zero', 'Positive');
+grid on;
+hold off;
+
+% 3. Output Membership Functions
+subplot(3, 1, 3);
+hold on;
+bar(output_range, [output_low, output_medium, output_high], 0.4, 'FaceColor', 'c');
+xlabel('Output');
+ylabel('Membership Degree');
+title('Output Membership Functions');
+xticks(output_values);
+xticklabels({'Low', 'Medium', 'High'});
+grid on;
+hold off;
+
+% Part 2: FLC Optimization using Genetic Algorithm
+
+% Define the problem
+% Here we assume the terms for error, change_in_error, and output are defined
+% Define the terms for the fuzzy system manually
+error_terms = {'negative', 'zero', 'positive'};
+change_in_error_terms = {'negative', 'zero', 'positive'};
+output_terms = {'low', 'medium', 'high'};
+
+% Number of parameters to optimize (length of chromosome)
+num_params = length(error_terms) + length(change_in_error_terms) + length(output_terms);
+
+% Initialize genetic algorithm parameters
+population_size = 50;
+generations = 20;
+
+% Initialize population
+population = rand(population_size, num_params) * 2 - 1; % Random values between -1 and 1
+fitness = zeros(population_size, 1); 
+
+% Main genetic algorithm loop
+for generation = 1:generations
+    % Evaluate fitness for the population
+    for i = 1:population_size
+        fitness(i) = evaluate_fitness(population(i, :));
+    end
+    
+    % Selection (tournament selection)
+    selected_indices = tournament_selection(fitness, population_size);
+    selected_population = population(selected_indices, :);
+    
+    % Crossover and mutation
+    offspring = crossover_and_mutate(selected_population);
+    
+    % Create new population
+    population = [selected_population; offspring];
+end
+
+% Function to evaluate fitness
+function average_temperature_deviation = evaluate_fitness(params)
+    % Update membership functions with the parameters (dummy example)
+    % You should implement the actual logic for updating the membership functions
+    update_membership_functions(params);
+    
+    % Initialize the fuzzy control system simulation
+    % Simulating the FLC with random inputs
+    num_samples = 100;
+    temperature_setpoint = 25; % Desired room temperature
+    temperature_deviation_sum = 0;
+
+    for sample = 1:num_samples
+        % Generate random error and change_in_error values
+        error_input = rand() * 20 - 10; % Random value between -10 and 10
+        change_input = rand() * 10 - 5; % Random value between -5 and 5
+        
+        % Compute FLC output (dummy example)
+        output_value = simulate_fuzzy_logic_controller(error_input, change_input);
+        
+        % Calculate temperature deviation
+        temperature_deviation = abs(output_value - temperature_setpoint);
+        temperature_deviation_sum = temperature_deviation_sum + temperature_deviation;
+    end
+
+    % Calculate the average temperature deviation as the fitness
+    average_temperature_deviation = temperature_deviation_sum / num_samples;
+end
+
+% Dummy function to simulate the fuzzy logic controller
+function output_value = simulate_fuzzy_logic_controller(error_input, change_input)
+    % Placeholder for actual fuzzy logic control logic
+    output_value = (error_input + change_input) / 2; % Replace with actual logic
+end
+
+% Function to update membership functions
+function update_membership_functions(params)
+    % Here you should implement the logic to update your membership functions
+    % based on the provided params.
+end
+
+% Tournament selection function
+function selected_indices = tournament_selection(fitness, population_size)
+    tournament_size = 3; % Set tournament size
+    selected_indices = zeros(population_size, 1);
+    
+    for i = 1:population_size
+        competitors = randperm(population_size, tournament_size);
+        [~, best_idx] = min(fitness(competitors)); % Select the best competitor
+        selected_indices(i) = competitors(best_idx); % Select index of the best competitor
+    end
+end
+
+% Crossover and mutation function
+function offspring = crossover_and_mutate(selected_population)
+    [num_parents, num_params] = size(selected_population);
+    offspring = zeros(num_parents, num_params);
+    
+    for i = 1:2:num_parents
+        % Crossover (single point)
+        parent1 = selected_population(i, :);
+        parent2 = selected_population(i+1, :);
+        crossover_point = randi([1, num_params]);
+        
+        offspring(i, :) = [parent1(1:crossover_point), parent2(crossover_point+1:end)];
+        offspring(i+1, :) = [parent2(1:crossover_point), parent1(crossover_point+1:end)];
+        
+        % Mutation
+        mutation_rate = 0.1;
+        mutation_mask = rand(size(offspring(i, :))) < mutation_rate;
+        offspring(i, mutation_mask) = randn(sum(mutation_mask), 1) * 0.1; % Small Gaussian mutation
+        offspring(i+1, mutation_mask) = randn(sum(mutation_mask), 1) * 0.1; % Small Gaussian mutation
+    end
+end
+
+% Visualization of optimized membership functions (assuming you've updated them)
+figure;
+subplot(3, 1, 1);
+hold on;
+% Plot error membership functions (dummy example)
+plot([-10, -5, 0], [1, 0, 0], 'b', 'LineWidth', 2); % Negative
+plot([-5, 0, 5], [0, 1, 0], 'g', 'LineWidth', 2); % Zero
+plot([0, 5, 10], [0, 0, 1], 'r', 'LineWidth', 2); % Positive
+xlabel('Error');
+ylabel('Membership Degree');
+title('Optimized Membership Functions for Error');
+legend('Negative', 'Zero', 'Positive');
+grid on;
+hold off;
+
+subplot(3, 1, 2);
+hold on;
+% Plot change_in_error membership functions (dummy example)
+plot([-5, -3, 0], [1, 0, 0], 'b', 'LineWidth', 2); % Negative
+plot([-3, 0, 3], [0, 1, 0], 'g', 'LineWidth', 2); % Zero
+plot([0, 3, 5], [0, 0, 1], 'r', 'LineWidth', 2); % Positive
+xlabel('Change in Error');
+ylabel('Membership Degree');
+title('Optimized Membership Functions for Change in Error');
+legend('Negative', 'Zero', 'Positive');
+grid on;
+hold off;
+
+subplot(3, 1, 3);
+hold on;
+% Plot output membership functions (dummy example)
+bar([-1, 0, 1], [0.5, 1, 0.5], 0.4, 'FaceColor', 'c');
+xlabel('Output');
+ylabel('Membership Degree');
+title('Optimized Membership Functions for Output');
+xticks([-1, 0, 1]);
+xticklabels({'Low', 'Medium', 'High'});
+grid on;
+hold off;
+
+% Part 3: Genetic Algorithm with Benchmark Functions
+
+% Ensure reproducibility
+rng(42); % Seed the random number generator for reproducibility
+
+% Benchmark Functions
+function fitness = rastrigin(individual)
+    fitness = sum(individual.^2 - 10 * cos(2 * pi * individual) + 10);
+end
+
+function fitness = rosenbrock(individual)
+    fitness = sum(100 * (individual(2:end) - individual(1:end-1).^2).^2 + (1 - individual(1:end-1)).^2);
+end
+
+% Create Individual
+function individual = create_individual(dim)
+    individual = -5.12 + (5.12 + 5.12) * rand(1, dim); % Random individual in [-5.12, 5.12]
+end
+
+% Genetic Algorithm Setup
+function [population, fitness_values] = setup_toolbox(dim, function_handle, population_size)
+    population = cell(population_size, 1); % Initialize cell array for population
+    for i = 1:population_size
+        population{i} = create_individual(dim);
+    end
+    fitness_values = zeros(population_size, 1); % Initialize fitness values array
+    for i = 1:population_size
+        fitness_values(i) = function_handle(population{i}); % Evaluate fitness
+    end
+end
+
+% Selection, Crossover, and Mutation
+function selected = select(population, fitness_values)
+    % Tournament selection
+    tournament_size = 3;
+    num_selected = length(population);
+    selected = cell(num_selected, 1);
+    for i = 1:num_selected
+        competitors = randi(num_selected, tournament_size, 1);
+        [~, best_idx] = min(fitness_values(competitors));
+        selected{i} = population{competitors(best_idx)};
+    end
+end
+
+function offspring = crossover(parent1, parent2, alpha)
+    % Blend crossover
+    offspring = (1-alpha) * parent1 + alpha * parent2 + alpha * (rand(size(parent1)) - 0.5);
+end
+
+function mutated = mutate(individual, mu, sigma)
+    % Gaussian mutation
+    mutated = individual; % Copy the individual
+    mutation_mask = rand(size(individual)) < 0.2; % mutation probability
+    % Generate Gaussian noise for mutations
+    noise = normrnd(mu, sigma, size(individual)); % Create noise of the same size
+    % Apply mutation only where mutation_mask is true
+    mutated(mutation_mask) = mutated(mutation_mask) + noise(mutation_mask);
+end
+
+% Main Genetic Algorithm
+function best_individual = genetic_algorithm(dim, function_handle, generations, population_size)
+    [population, fitness_values] = setup_toolbox(dim, function_handle, population_size);
+    
+    for gen = 1:generations
+        selected_population = select(population, fitness_values);
+        offspring = cell(size(population));
+        
+        for i = 1:2:length(selected_population)-1
+            parent1 = selected_population{i};
+            parent2 = selected_population{i+1};
+            child1 = crossover(parent1, parent2, 0.5);
+            child2 = crossover(parent2, parent1, 0.5);
+            offspring{i} = mutate(child1, 0, 1);
+            offspring{i+1} = mutate(child2, 0, 1);
+        end
+        
+        % Handle the case of odd population size
+        if mod(length(selected_population), 2) == 1
+            offspring{end} = selected_population{end}; % Carry forward the last individual
+        end
+        
+        population = [selected_population; offspring]; % Concatenate selected and offspring
+        fitness_values = zeros(size(population)); % Initialize new fitness values
+        for i = 1:length(population)
+            fitness_values(i) = function_handle(population{i}); % Re-evaluate fitness
+        end
+    end
+    
+    % Return the best individual
+    [~, best_idx] = min(fitness_values);
+    best_individual = population{best_idx};
+end
+
+% Multiple Trials
+function best_results = run_trials(dim, function_handle, num_trials)
+    best_results = zeros(num_trials, 1);
+    for trial = 1:num_trials
+        best_individual = genetic_algorithm(dim, function_handle, 100, 50);
+        best_results(trial) = feval(function_handle, best_individual);
+    end
+end
+
+% Visualization
+function plot_convergence(results, dimension, benchmark_function)
+    label = sprintf('%s - %dD', func2str(benchmark_function), dimension);
+    plot(results, 'o-', 'DisplayName', label);
+    hold on;
+end
+
+% Main execution logic
+dimensions = [2, 10];
+benchmark_functions = {@rastrigin, @rosenbrock}; % Use function handles
+num_trials = 15;
+
+for dim = dimensions
+    for function_handle = benchmark_functions
+        fprintf('Running Genetic Algorithm on %s with %d dimensions...\n', func2str(function_handle{1}), dim);
+        best_results = run_trials(dim, function_handle{1}, num_trials);
+        
+        fprintf('Best Performance: %.4f\n', min(best_results));
+        fprintf('Worst Performance: %.4f\n', max(best_results));
+        fprintf('Average Performance: %.4f\n', mean(best_results));
+        fprintf('Standard Deviation of Best Performances: %.4f\n', std(best_results));
+        fprintf('Range of Best Performances: %.4f\n', range(best_results));
+        
+        % Top 3 best performances
+        top_3_best = sort(best_results);
+        fprintf('Top 3 Best Performances: %.4f, %.4f, %.4f\n', top_3_best(1), top_3_best(2), top_3_best(3));
+        
+        % Plot convergence
+        plot_convergence(best_results, dim, function_handle{1});
+    end
+end
+
+% Finalize the plot
+xlabel('Trial');
+ylabel('Best Fitness Value');
+title('Convergence of Genetic Algorithm');
+legend('show');
+grid on;
+hold off;
+
+
+
+
+
+
+
+
+
